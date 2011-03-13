@@ -1,15 +1,19 @@
 #=============================================================================
 # Copyright 2010-2011 Andrey Volkov <avolkov1221@gmail.com>.
 #
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
+# This file is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
 #
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
-#=============================================================================
-# (To distributed this file outside of CMake, substitute the full
-#  License text for the above reference.)
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; see the file COPYING3.  If not see
+# <http://www.gnu.org/licenses/>.
 #
 # AC_XXX macroses library for simplify autoconf scripts porting
 #
@@ -17,7 +21,7 @@
 
 include(CheckIncludeFile)
 include(CheckIncludeFiles)
-include(CheckPrototypeExists)
+include(CheckSymbolExists)
 include(CheckDIRSymbolExists)
 include(CheckFunctionExists)
 
@@ -85,36 +89,167 @@ function(AC_MSG_ERROR msg)
 endfunction(AC_MSG_ERROR)
 
 function(AC_MSG_RESULT msg)
-    message(STATUS "${msg}\n")
+    message(STATUS "${msg}")
 endfunction(AC_MSG_RESULT)
 
-macro(AC_DEFINE have_var value description)
+macro(AC_DEFINE have_var)
     if(${ARGC} EQUAL 1)
-      set(value 1)
+      set(val 1)
+    else()
+      set(val ${ARGV1})
     endif()
 	if(${ARGC} EQUAL 3)
-		set(_ac_config_h_string_ 
-			"${_ac_config_h_string_}\n${description}\n")
+        set(_ac_config_h_string_ 
+        	"${_ac_config_h_string_}\n${ARGV2}")
 	endif()
+    set(${have_var} ${val} CACHE INTERNAL "${ARGV2}") 
 	set(_ac_config_h_string_ 
-		"${_ac_config_h_string_}\n"
-		"#cmakedefine	${have_var} \${${have_var}}\n")
+		"${_ac_config_h_string_}\n#cmakedefine ${have_var} @${have_var}@\n")
 endmacro(AC_DEFINE)
 
 macro(AC_CHECK_HEADERS)
+    set(ac_cv_headers 1)
 	foreach(h ${ARGV})
-		string(REGEX REPLACE "[.\\/]" "_" VARIABLE "${h}")
-		set(VARIABLE "HAVE_${VARIABLE}")
-		string(TOUPPER "${VARIABLE}" VARIABLE)
-		check_include_file(${h} ${VARIABLE})
-		if(!${${VARIABLE}})
-		          unset(${VARIABLE})
-		else()
-			AC_DEFINE(${VARIABLE} 1
-			"/* Define to 1 if you have the <${h}> header file. */")
-		endif()
+		string(REGEX REPLACE "[.\\/]" "_" name "${h}")
+	    set(desc "/* Define to 1 if you have the <${h}> header file. */") 
+		string(TOUPPER "HAVE_${name}" var)
+		if(NOT DEFINED ac_cv_header_${name})
+    		check_include_file(${h} ${var})
+    		if(!${${var}})
+    		    set(ac_cv_header_${name} 0 CACHE INTERNAL ${desc})
+                unset(ac_cv_headers)
+    		else()
+    		    set(ac_cv_header_${name} 1 CACHE INTERNAL ${desc}) 
+    		endif()
+    	endif()
+		if(NOT DEFINED ac_cv_header_${name}_config_h)
+		    set(ac_cv_header_${name}_config_h 1)
+    		if(ac_cv_header_${name})
+    			AC_DEFINE(${var} 1 ${desc})
+    		else()
+    	        unset(${var})
+    		endif()
+    	endif()
 	endforeach()
 endmacro(AC_CHECK_HEADERS)
+
+macro(AC_HEADER_STDC)
+    if(NOT DEFINED ac_cv_header_stdc)
+        message(STATUS "Checking whether system has ANSI C header files")
+        AC_CHECK_HEADERS(
+                "dlfcn.h"
+                "stdint.h"
+                "stddef.h"
+                "inttypes.h"
+                "stdlib.h"
+                "strings.h"
+                "string.h"
+                "float.h")
+        if(ac_cv_headers)
+            # SunOS 4.x string.h does not declare mem*, contrary to ANSI.
+        	check_symbol_exists(memchr "string.h" memchr_exist)
+        	if(memchr_exist)
+        	    # ISC 2.0.2 stdlib.h does not declare free, contrary to ANSI.
+        		check_symbol_exists(free "stdlib.h" free_exist)
+        		if(free_exist)
+        			message(STATUS "ANSI C header files - found")
+        			set(STDC_HEADERS 1 CACHE INTERNAL "System has ANSI C header files")
+        		endif(free_exist)
+        	endif(memchr_exist)
+        endif(ac_cv_headers)
+        if(NOT STDC_HEADERS)
+        	message(STATUS "ANSI C header files - not found")
+        	set(STDC_HEADERS 0 CACHE INTERNAL "System has NOT ANSI C header files")
+        endif(NOT STDC_HEADERS)
+        set(ac_cv_header_stdc ${STDC_HEADERS}) 
+    endif()        
+endmacro(AC_HEADER_STDC)
+
+macro(AC_INCLUDES_DEFAULT)
+    if(${ARGC} EQUAL 0)
+        if(NOT DEFINED _ac_includes_default_default)
+            unset(i)
+            set(i "#include <stdio.h>\n"
+                  "#ifdef HAVE_SYS_TYPES_H\n"
+                  "# include <sys/types.h>\n"
+                  "#endif\n"
+                  "#ifdef HAVE_SYS_STAT_H\n"
+                  "# include <sys/stat.h>\n"
+                  "#endif\n"
+                  "#ifdef STDC_HEADERS\n"
+                  "# include <stdlib.h>\n"
+                  "# include <stddef.h>\n"
+                  "#else\n"
+                  "# ifdef HAVE_STDLIB_H\n"
+                  "#  include <stdlib.h>\n"
+                  "# endif\n"
+                  "#endif\n"
+                  "#ifdef HAVE_STRING_H\n"
+                  "# if !defined STDC_HEADERS && defined HAVE_MEMORY_H\n"
+                  "#  include <memory.h>\n"
+                  "# endif\n"
+                  "# include <string.h>\n"
+                  "#endif\n"
+                  "#ifdef HAVE_STRINGS_H\n"
+                  "# include <strings.h>\n"
+                  "#endif\n"
+                  "#ifdef HAVE_INTTYPES_H\n"
+                  "# include <inttypes.h>\n"
+                  "#endif\n"
+                  "#ifdef HAVE_STDINT_H\n"
+                  "# include <stdint.h>\n"
+                  "#endif\n"
+                  "#ifdef HAVE_UNISTD_H\n"
+                  "# include <unistd.h>\n"
+                  "#endif\n"
+                 )
+             foreach(f ${i})
+               set(_ac_includes_default_default
+                       "${_ac_includes_default_default}${f}")
+             endforeach()
+             AC_HEADER_STDC()
+             AC_CHECK_HEADERS(
+                   "sys/types.h"
+                   "sys/stat.h"
+                   "stdlib.h"
+                   "string.h"
+                   "memory.h"
+                   "strings.h"
+                   "inttypes.h"
+                   "stdint.h"
+                   "unistd.h")
+        endif()                
+        set(_ac_includes_default
+            ${_ac_includes_default_default})
+    else()
+        set(_ac_includes_default
+            $ARGV1)
+    endif()           
+endmacro()
+
+
+macro(AC_TRY_COMPILE includes test_code result)
+    if(NOT DEFINED ${result})
+        string(CONFIGURE "${_ac_config_h_string_}" confdefs)
+        set(confdefs 
+"
+${confdefs}
+/* end confdefs.h. */
+${includes}
+int main () {
+    ${test_code}
+    ;
+return 0;
+}
+")
+        CHECK_C_SOURCE_COMPILES("${confdefs}" ${result})
+        if(${result})
+            set(${result} 1 CACHE INTERNAL "${result}")
+        else()
+            set(${result} 0 CACHE INTERNAL "${result}")
+        endif()
+    endif()
+endmacro()
 
 macro(AC_CHECK_TYPE check_type)
     string(REPLACE " " "_" name ${check_type})
@@ -126,6 +261,7 @@ macro(AC_CHECK_TYPE check_type)
     	foreach(h ${lst})
             set(s "${s}\n${h}")
         endforeach()
+#May be AC_TRY_COMPILE("${s}" "${check_type} *d = 0" ac_cv_type_${name})?
         check_c_source_compiles("
             ${s}
             int main(int argc, char *argv[])
@@ -133,17 +269,19 @@ macro(AC_CHECK_TYPE check_type)
               ${check_type} *d = 0;
               return 0;
             }" ac_cv_type_${name} )
-
+    endif()
+	if(NOT DEFINED ac_cv_type_${name}_config_h)
+	    set(ac_cv_type_${name}_config_h 1)
 		if(!ac_cv_type_${name})
-		          unset(ac_cv_type_${name})
-		          unset(acx_cv_type_${name})
+	          unset(ac_cv_type_${name})
+	          unset(acx_cv_type_${name})
 		else()
 			AC_DEFINE(ac_cv_type_${name} 1
 			    "/* Define to 1 if you have the ${check_type} type. */")
 			AC_DEFINE(acx_cv_type_${name} ${check_type}
-			    "/* Define to ${check_type} if you have the ${check_type} type. */")
+			"/* Define to ${check_type} if you have the ${check_type} type. */")
 		endif()
-    endif()
+	endif()
 endmacro(AC_CHECK_TYPE)
 
 #AC_DEFUN([AC_CHECK_FUNCS],
@@ -168,156 +306,100 @@ macro(AC_CHECK_FUNCS)
     endforeach()
 endmacro(AC_CHECK_FUNCS)
 
-macro(AC_HEADER_STDC)
-    message(STATUS "Checking whether system has ANSI C header files")
-    check_include_files(
-        "dlfcn.h;stdint.h;stddef.h;inttypes.h;stdlib.h;strings.h;string.h;float.h" 
-        StandardHeadersExist)
-    if(StandardHeadersExist)
-    	check_prototype_exists(memchr "string.h" memchrExists)
-    	if(memchrExists)
-    		check_prototype_exists(free "stdlib.h" freeExists)
-    		if(freeExists)
-    			message(STATUS "ANSI C header files - found")
-    			set(STDC_HEADERS 1 CACHE INTERNAL "System has ANSI C header files")
-    			set(HAVE_STRINGS_H 1)
-    			set(HAVE_STRING_H 1)
-    			set(HAVE_FLOAT_H 1)
-    			set(HAVE_STDLIB_H 1)
-    			set(HAVE_STDDEF_H 1)
-    			set(HAVE_STDINT_H 1)
-    			set(HAVE_INTTYPES_H 1)
-    			set(HAVE_DLFCN_H 1)
-    		endif(freeExists)
-    	endif(memchrExists)
-    endif(StandardHeadersExist)
-    
-    if(NOT STDC_HEADERS)
-    	message(STATUS "ANSI C header files - not found")
-    	set(STDC_HEADERS 0 CACHE INTERNAL "System has ANSI C header files")
-    endif(NOT STDC_HEADERS)
-endmacro(AC_HEADER_STDC)
+macro(AC_CHECK_DECL func)
+#   as_decl_name=`echo $2|sed 's/ *(.*//'`
+    string(REGEX REPLACE "^([ \t]*)(.*)([ \t]*[(].*)" "\\2" as_decl_name ${func})       
+    if(NOT DEFINED ac_cv_have_decl_${as_decl_name})
+        if(${ARGC} EQUAL 1)
+            AC_INCLUDES_DEFAULT()
+            set(includes ${_ac_includes_default})
+        else()
+            set(includes ${ARGV1})
+        endif()
 
-MACRO(AC_HEADER_DIRENT)
-check_dirsymbol_exists("sys/stat.h;sys/types.h;dirent.h" HAVE_DIRENT_H)
-if(HAVE_DIRENT_H)
-	set(HAVE_SYS_STAT_H 1)
-	set(HAVE_SYS_TYPES_H 1)
-endif (HAVE_DIRENT_H)
-ENDMACRO(AC_HEADER_DIRENT)
+#   as_decl_use=`echo $2|sed -e 's/(/((/' -e 's/)/) 0&/' -e 's/,/) 0& (/g'`
+        string(REPLACE "(" "((" as_decl_use ${func})
+        string(REPLACE ")" ") 0)" as_decl_use ${as_decl_use})
+        string(REPLACE "," ") 0, (" as_decl_use ${as_decl_use})
 
-# AC_HEADER_STDBOOL
-# -----------------
-# Check for stdbool.h that conforms to C99.
-
-#macro(AC_HEADER_STDBOOL)
-#	message(STATUS "Checking for stdbool.h that conforms to C99")
-#
-#[AC_CACHE_CHECK([for stdbool.h that conforms to C99],
-#   [ac_cv_header_stdbool_h],
-#   [AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
-#      [[
-##include <stdbool.h>
-##ifndef bool
-# "error: bool is not defined"
-##endif
-##ifndef false
-# "error: false is not defined"
-##endif
-##if false
-# "error: false is not 0"
-##endif
-##ifndef true
-# "error: true is not defined"
-##endif
-##if true != 1
-# "error: true is not 1"
-##endif
-##ifndef __bool_true_false_are_defined
-# "error: __bool_true_false_are_defined is not defined"
-##endif
-#
-#        struct s { _Bool s: 1; _Bool t; } s;
-#
-#        char a[true == 1 ? 1 : -1];
-#        char b[false == 0 ? 1 : -1];
-#        char c[__bool_true_false_are_defined == 1 ? 1 : -1];
-#        char d[(bool) 0.5 == true ? 1 : -1];
-#        bool e = &s;
-#        char f[(_Bool) 0.0 == false ? 1 : -1];
-#        char g[true];
-#        char h[sizeof (_Bool)];
-#        char i[sizeof s.t];
-#        enum { j = false, k = true, l = false * true, m = true * 256 };
-#        _Bool n[m];
-#        char o[sizeof n == m * sizeof n[0] ? 1 : -1];
-#        char p[-1 - (_Bool) 0 < 0 && -1 - (bool) 0 < 0 ? 1 : -1];
-##       if defined __xlc__ || defined __GNUC__
-#         /* Catch a bug in IBM AIX xlc compiler version 6.0.0.0
-#            reported by James Lemley on 2005-10-05; see
-#            http://lists.gnu.org/archive/html/bug-coreutils/2005-10/msg00086.html
-#            This test is not quite right, since xlc is allowed to
-#            reject this program, as the initializer for xlcbug is
-#            not one of the forms that C requires support for.
-#            However, doing the test right would require a runtime
-#            test, and that would make cross-compilation harder.
-#            Let us hope that IBM fixes the xlc bug, and also adds
-#            support for this kind of constant expression.  In the
-#            meantime, this test will reject xlc, which is OK, since
-#            our stdbool.h substitute should suffice.  We also test
-#           quickly whether someone messes up the test in the
-#            future.  */
-#         char digs[] = "0123456789";
-#         int xlcbug = 1 / (&(digs + 5)[-2 + (bool) 1] == &digs[4] ? 1 : -1);
-##       endif
-#        /* Catch a bug in an HP-UX C compiler.  See
-#           http://gcc.gnu.org/ml/gcc-patches/2003-12/msg02303.html
-#           http://lists.gnu.org/archive/html/bug-coreutils/2005-11/msg00161.html
-#         */
-#        _Bool q = true;
-#        _Bool *pq = &q;
-#      ]],
-#      [[
-#        *pq |= q;
-#        *pq |= ! q;
-#        /* Refer to every declared value, to avoid compiler optimizations.  */
-#        return (!a + !b + !c + !d + !e + !f + !g + !h + !i + !!j + !k + !!l
-#                + !m + !n + !o + !p + !q + !pq);
-#      ]])],
-#      [ac_cv_header_stdbool_h=yes],
-#      [ac_cv_header_stdbool_h=no])])
-#AC_CHECK_TYPES([_Bool])
-#if test $ac_cv_header_stdbool_h = yes; then
-#  AC_DEFINE(HAVE_STDBOOL_H, 1, [Define to 1 if stdbool.h conforms to C99.])
-#fi
-#])# AC_HEADER_STDBOOL
-#
-#endmacro(AC_HEADER_DIRENT)
-
-macro(AC_CHECK_DECL funcs)
-    if(${ARGC} EQUAL 1)
-#set includes to defalt    
+        AC_TRY_COMPILE("${includes}"
+"
+                #ifndef ${as_decl_name}
+                #    ifdef __cplusplus
+                        (void) ${as_decl_use};
+                #    else
+                        (void) ${as_decl_name};
+                #    endif
+                #endif
+"        
+         ac_cv_have_decl_${as_decl_name})
     endif()
-
 endmacro(AC_CHECK_DECL)
 
 macro(AC_CHECK_DECLS funcs)
     if(${ARGC} EQUAL 1)
-#set includes to defalt    
+        AC_INCLUDES_DEFAULT()
+        set(includes ${_ac_includes_default})
+    else()
+        set(includes ${ARGV1})
     endif()
-    
+
     foreach(f ${funcs})
-    
+        string(REGEX REPLACE 
+               "^([ \t]*)(.*)([ \t]*[(].*)" "\\2" name ${f})       
+        string(TOUPPER "${name}" up_f)
+        set(desc
+"/* Define to 1 if you have the declaration of '${name}',
+    and to 0 if you don't. */")
+        if(NOT DEFINED HAVE_DECL_${up_f} )
+            AC_CHECK_DECL(${f} ${includes})
+            set(HAVE_DECL_${up_f} 
+                ${ac_cv_have_decl_${name}} CACHE INTERNAL 
+                ${desc})
+        endif()
+        if(NOT DEFINED HAVE_DECL_${up_f}_config_h )
+            set(HAVE_DECL_${up_f}_config_h 1)
+           	set(_ac_config_h_string_ 
+    		"${_ac_config_h_string_}\n${desc}\n#cmakedefine01 HAVE_DECL_${up_f}\n")
+        endif()         
     endforeach()
 endmacro(AC_CHECK_DECLS)
 
 macro(AC_CHECK_SIZEOF check_type)
     string(REPLACE " " "_" name ${check_type})
     string(REPLACE "*" "p" name ${name})
-    string(TOUPPER ${name} up_name)
-    CHECK_TYPE_SIZE("${check_type}" SIZEOF_${up_name})
-    set(ac_cv_sizeof_${name} ${SIZEOF_${up_name}})
-    message(STATUS "ac_cv_sizeof_${name} is ${ac_cv_sizeof_${name}}")
+    if(NOT DEFINED ac_cv_sizeof_${name})
+        string(TOUPPER ${name} up_name)
+        CHECK_TYPE_SIZE("${check_type}" SIZEOF_${up_name})
+        set(desc "size of '${check_type}' is ${ac_cv_sizeof_${name}}")
+        set(ac_cv_sizeof_${name} ${SIZEOF_${up_name}} CACHE INTERNAL ${desc})
+        message(STATUS ${desc})
+    endif()    
 endmacro(AC_CHECK_SIZEOF)
 
-include(stdint)
+include(headers)
+
+# A function to check for zlib availability.  zlib is used by default
+# unless the user configured with --disable-nls.
+
+macro(AM_ZLIB)
+  # See if the user specified whether he wants zlib support or not.
+    include(FindZLIB)
+    if(ZLIB_FOUND)
+        set(val 1)
+    else()
+        set(val 0)
+    endif()
+    AC_DEFINE(HAVE_ZLIB_H ${val} 
+              "/* Define to 1 if you have the <zlib.h> header file. */")
+#  AC_ARG_WITH(zlib,
+#    [  --with-zlib             include zlib support (auto/yes/no) [default=auto]],
+#    [], [with_zlib=auto])
+
+#  if test "$with_zlib" != "no"; then
+#    AC_SEARCH_LIBS(zlibVersion, z, [AC_CHECK_HEADERS(zlib.h)])
+#    if test "$with_zlib" = "yes" -a "$ac_cv_header_zlib_h" != "yes"; then
+#      AC_MSG_ERROR([zlib (libz) library was explicitly requested but not found])
+#    fi
+#  fi
+endmacro(AM_ZLIB)

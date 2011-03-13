@@ -1,3 +1,6 @@
+#=============================================================================
+# Converted for CMake by Andrey Volkov <avolkov1221@gmail.com>.
+#
 # @synopsis GCC_HEADER_STDINT [( HEADER-TO-GENERATE [, HEADERS-TO-CHECK])]
 #
 # the "ISO C9X: 7.18 Integer types <stdint.h>" section requires the
