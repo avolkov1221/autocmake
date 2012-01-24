@@ -1,5 +1,5 @@
 #=============================================================================
-# Converted for CMake by Andrey Volkov <avolkov1221@gmail.com>.
+# Converted for CMake by Andrey Volkov <avolkov@volklog.org>.
 #
 # @synopsis GCC_HEADER_STDINT [( HEADER-TO-GENERATE [, HEADERS-TO-CHECK])]
 #
@@ -37,6 +37,8 @@
 #
 # @author  Guido Draheim <guidod@gmx.de>, Paolo Bonzini <bonzini@gnu.org>
 
+include(CheckCSourceCompiles)
+
 macro(GCC_HEADER_STDINT)
     if(${ARGC} EQUAL 0)
         set(_GCC_STDINT_H "_stdint.h")
@@ -63,36 +65,27 @@ macro(GCC_HEADER_STDINT)
         unset(ac_cv_type_int_fast32_t)
         unset(ac_cv_type_uint64_t)
         message(STATUS "looking for a compliant stdint.h in ${i}")
-        
-        AC_CHECK_TYPE(uintmax_t
-                      "#include <sys/types.h>"
-                      "#include <${i}>")
+        set(includes "#include <sys/types.h>
+                      #include <${i}>")
+        AC_CHECK_TYPE(uintmax_t ${includes})
         if(ac_cv_type_uintmax_t)
             set(acx_cv_header_stdint ${i})
-            AC_CHECK_TYPE(uintptr_t
-                            "#include <sys/types.h>"
-                            "#include {$i}")
+            AC_CHECK_TYPE(uintptr_t includes)
             if(NOT ac_cv_type_uintptr_t)
                 set(acx_cv_header_stdint_kind "(mostly complete)")
             endif() 
             
-            AC_CHECK_TYPE(int_least32_t
-                            "#include <sys/types.h>"
-                            "#include <${i}>")
+            AC_CHECK_TYPE(int_least32_t includes)
             if(NOT ac_cv_type_int_least32_t)
                 set(acx_cv_header_stdint_kind "(mostly complete)")
             endif() 
             
-            AC_CHECK_TYPE(int_fast32_t
-                            "#include <sys/types.h>"
-                            "#include <${i}>")
+            AC_CHECK_TYPE(int_fast32_t includes)
             if(NOT ac_cv_type_int_fast32_t)
                 set(acx_cv_header_stdint_kind "(mostly complete)")
             endif() 
             
-            AC_CHECK_TYPE(uint64_t
-                            "#include <sys/types.h>"
-                            "#include <${i}>")
+            AC_CHECK_TYPE(uint64_t includes)
             if(NOT ac_cv_type_uint64_t)
                 set(acx_cv_header_stdint_kind "(lacks uint64_t)")
             endif()
@@ -558,6 +551,3 @@ endmacro(GCC_HEADER_STDINT)
 #ac_cv_type_int_least32_t="$ac_cv_type_int_least32_t"
 #ac_cv_type_int_fast32_t="$ac_cv_type_int_fast32_t"
 #ac_cv_sizeof_void_p="$ac_cv_sizeof_void_p"
-
-
-

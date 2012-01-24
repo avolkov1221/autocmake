@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright 2010-2011 Andrey Volkov <avolkov1221@gmail.com>.
+# Copyright 2010-2012 Andrey Volkov <avolkov@volklog.org>.
 #
 # This file is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by

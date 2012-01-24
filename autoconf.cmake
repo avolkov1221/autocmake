@@ -1,5 +1,5 @@
 #=============================================================================
-# Copyright 2010-2011 Andrey Volkov <avolkov1221@gmail.com>.
+# Copyright 2010-2012 Andrey Volkov <avolkov@volklog.org>.
 #
 # This file is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by
@@ -17,7 +17,6 @@
 #
 # AC_XXX macroses library for simplify autoconf scripts porting
 #
-# $Id: autoconf.cmake 3 2010-02-19 13:03:54Z avolkov $
 
 include(CheckIncludeFile)
 include(CheckIncludeFiles)
@@ -31,9 +30,9 @@ macro(AC_INIT package version)
 	set(AC_PACKAGE_NAME "${package}")
 	set(PACKAGE_NAME AC_PACKAGE_NAME)
 
-	set(AC_PACKAGE_VERSION ${version})
-	set(PACKAGE_VERSION	${version})
-	set(VERSION	${version})
+	set(AC_PACKAGE_VERSION "${version}")
+	set(PACKAGE_VERSION	"${version}")
+	set(VERSION	"${version}")
 	
 	if(${ARGC} GREATER 2)
     	set(AC_PACKAGE_BUGREPORT ${argv2})
@@ -231,18 +230,16 @@ endmacro()
 macro(AC_TRY_COMPILE includes test_code result)
     if(NOT DEFINED ${result})
         string(CONFIGURE "${_ac_config_h_string_}" confdefs)
-        set(confdefs 
-"
-${confdefs}
-/* end confdefs.h. */
-${includes}
-int main () {
-    ${test_code}
-    ;
-return 0;
-}
-")
-        CHECK_C_SOURCE_COMPILES("${confdefs}" ${result})
+        CHECK_C_SOURCE_COMPILES(
+            "${confdefs}
+            /* end confdefs.h. */
+            ${includes}
+            int main () {
+                ${test_code}
+                ;
+            return 0;
+            }
+            " ${result})
         if(${result})
             set(${result} 1 CACHE INTERNAL "${result}")
         else()
@@ -258,9 +255,11 @@ macro(AC_CHECK_TYPE check_type)
     if(NOT DEFINED ac_cv_type_${name})
         set(lst ${ARGV})
         list(REMOVE_AT lst 0)
+        unset(s)
     	foreach(h ${lst})
             set(s "${s}\n${h}")
         endforeach()
+    message(STATUS "AC_CHECK_TYPE (${name}): includes ${s}")
 #May be AC_TRY_COMPILE("${s}" "${check_type} *d = 0" ac_cv_type_${name})?
         check_c_source_compiles("
             ${s}
@@ -293,15 +292,16 @@ endmacro(AC_CHECK_TYPE)
 #])# AC_CHECK_FUNCS
 macro(AC_CHECK_FUNCS)
     foreach(f ${ARGV})
-        set(VARIABLE "HAVE_${f}") 
-        string(TOUPPER "${VARIABLE}" VARIABLE)
-        check_function_exists(${f} ${VARIABLE})
-        if(NOT ${VARIABLE})
-            unset(${VARIABLE})
-        else()
-#            AC_DEFINE_UNQUOTED()    
-			AC_DEFINE(${VARIABLE} 1
-    			"/* Define to 1 if you have the '${f}' function. */")
+        string(TOUPPER "HAVE_${f}" var)
+        if(NOT DEFINED ${var})
+            check_function_exists("${f}" ${var})
+        endif()
+        if(NOT DEFINED ${var}_config_h)
+            set(${var}_config_h 1)
+            if(${var})
+    			AC_DEFINE(${var} 1
+        			"/* Define to 1 if you have the '${f}' function. */")
+            endif()
         endif()
     endforeach()
 endmacro(AC_CHECK_FUNCS)
@@ -350,7 +350,7 @@ macro(AC_CHECK_DECLS funcs)
         string(TOUPPER "${name}" up_f)
         set(desc
 "/* Define to 1 if you have the declaration of '${name}',
-    and to 0 if you don't. */")
+  * and to 0 if you don't. */")
         if(NOT DEFINED HAVE_DECL_${up_f} )
             AC_CHECK_DECL(${f} ${includes})
             set(HAVE_DECL_${up_f} 
@@ -403,3 +403,48 @@ macro(AM_ZLIB)
 #    fi
 #  fi
 endmacro(AM_ZLIB)
+
+## ----------------------------------- ##
+## Getting the canonical system type.  ##
+## ----------------------------------- ##
+
+# The inputs are:
+#    cmake -Dhost=HOST -Dtarget=TARGET -Dbuild=BUILD
+#
+# The rules are:
+# 1. Build defaults to the current platform, as determined by config.guess.
+# 2. Host defaults to build.
+# 3. Target defaults to host.
+
+
+# _AC_CANONICAL_SPLIT(THING)
+# --------------------------
+# Generate the variables THING, THING_{alias cpu vendor os}.
+macro(_AC_CANONICAL_SPLIT thing)
+endmacro(_AC_CANONICAL_SPLIT)
+
+#m4_define([_AC_CANONICAL_SPLIT],
+#[case $ac_cv_$1 in
+#*-*-*) ;;
+#*) AC_MSG_ERROR([invalid value of canonical $1]);;
+#esac
+#AC_SUBST([$1], [$ac_cv_$1])dnl
+#ac_save_IFS=$IFS; IFS='-'
+#set x $ac_cv_$1
+#shift
+#AC_SUBST([$1_cpu], [$[1]])dnl
+#AC_SUBST([$1_vendor], [$[2]])dnl
+#shift; shift
+#[# Remember, the first character of IFS is used to create $]*,
+## except with old shells:
+#$1_os=$[*]
+#IFS=$ac_save_IFS
+#case $$1_os in *\ *) $1_os=`echo "$$1_os" | sed 's/ /-/g'`;; esac
+#AC_SUBST([$1_os])dnl
+#])# _AC_CANONICAL_SPLIT
+
+# AC_CANONICAL_TARGET
+# -------------------
+macro(AC_CANONICAL_TARGET)
+endmacro(AC_CANONICAL_TARGET)
+# AC_CANONICAL_TARGET
