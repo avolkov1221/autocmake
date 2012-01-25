@@ -21,7 +21,6 @@
 include(CheckIncludeFile)
 include(CheckIncludeFiles)
 include(CheckSymbolExists)
-include(CheckDIRSymbolExists)
 include(CheckFunctionExists)
 
 macro(AC_INIT package version)
@@ -218,14 +217,11 @@ macro(AC_INCLUDES_DEFAULT)
                    "stdint.h"
                    "unistd.h")
         endif()                
-        set(_ac_includes_default
-            ${_ac_includes_default_default})
+        set(_ac_includes_default ${_ac_includes_default_default})
     else()
-        set(_ac_includes_default
-            $ARGV1)
+        set(_ac_includes_default $ARGV1)
     endif()           
 endmacro()
-
 
 macro(AC_TRY_COMPILE includes test_code result)
     if(NOT DEFINED ${result})

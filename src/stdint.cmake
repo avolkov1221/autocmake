@@ -49,7 +49,7 @@ macro(GCC_HEADER_STDINT)
 #   inttype_headers=`echo inttypes.h sys/inttypes.h $2 | sed -e 's/,/ /g'`
     if(${ARGC} GREATER 1)
         list(REMOVE_AT ARGV 1) 
-        set(inttype_headers inttypes.h sys/inttypes.h)
+        set(inttype_headers "inttypes.h" "sys/inttypes.h")
         foreach(hdr ${ARGV})
             set(inttype_headers ${inttype_headers} ${hdr})
         endforeach()
